@@ -10,7 +10,11 @@
 # Project-local (this repo only):
 #   .opencode/agents → ../agents  (symlink, created once)
 #   .opencode/skills → ../skills  (symlink, created once)
-#   .github/copilot-instructions.md  (personas only, compiled)
+#     ^ IDE Copilot extensions that read .opencode/ directly pick up raw
+#       skill files here — not just the compiled instructions below.
+#   .github/copilot-instructions.md  (personas only, compiled — this is
+#     what GitHub Copilot's repo-level instructions feature reads; it does
+#     NOT cover IDE Copilot's own .opencode/ integration, if configured)
 
 set -euo pipefail
 
@@ -31,6 +35,37 @@ log() { printf '\033[1;34m[sync-ai]\033[0m %s\n' "$*"; }
 
 strip_frontmatter() {
   awk 'BEGIN{fm=0} /^---$/{if(NR==1){fm=1;next}else if(fm){fm=0;next}} !fm' "$1"
+}
+
+# agents/*.md are authored with a generic tool vocabulary (read_file, write_file,
+# run_terminal_cmd, web_search). That vocabulary is not any CLI's real tool names —
+# it must be translated per target or the agent silently gets no working tools
+# (confirmed: a Claude Code subagent with untranslated `tools: [write_file]` had
+# zero real write access and hallucinated fake tool-call output instead of erroring).
+# Only Claude Code's mapping is verified below; names with no entry pass through
+# unchanged (e.g. expert-react-frontend-developer.md already uses VS Code/Copilot-
+# specific names, which aren't part of this generic vocabulary at all).
+translate_tools_for_claude() {
+  awk '
+    BEGIN {
+      map["read_file"]="Read"
+      map["write_file"]="Write"
+      map["run_terminal_cmd"]="Bash"
+      map["web_search"]="WebSearch"
+      in_fm=0; in_tools=0
+    }
+    /^---$/ { in_fm = !in_fm; print; next }
+    in_fm && /^tools:/ { in_tools=1; print; next }
+    in_fm && in_tools && /^  - / {
+      name=$0
+      sub(/^  - /, "", name)
+      if (name in map) print "  - " map[name]
+      else print
+      next
+    }
+    in_fm && in_tools { in_tools=0 }
+    { print }
+  ' "$1"
 }
 
 sync_dir() {
@@ -94,7 +129,15 @@ log "Synced $count skill(s) → $ANTIGRAVITY_DIR/skills/"
 
 # ── Claude Code (global) ──────────────────────────────────────────────────────
 
-sync_dir "$AGENTS_DIR" "$CLAUDE_DIR/agents" "agent(s)"
+mkdir -p "$CLAUDE_DIR/agents"
+count=0
+for f in "$AGENTS_DIR"/*.md; do
+  [[ -f "$f" ]] || continue
+  translate_tools_for_claude "$f" > "$CLAUDE_DIR/agents/$(basename "$f")"
+  log "  → $CLAUDE_DIR/agents/$(basename "$f") (tools translated)"
+  ((count++))
+done
+log "Synced $count agent(s) → $CLAUDE_DIR/agents/ (tools translated to Claude Code names)"
 
 mkdir -p "$CLAUDE_DIR/commands"
 count=0
