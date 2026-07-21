@@ -7,6 +7,10 @@ tools:
   - read_file
   - write_file
   - run_terminal_cmd
+skills:
+  - explain-code
+  - write-unit-tests
+  - ngmodule-to-standalone-migration
 ---
 
 # Angular Developer

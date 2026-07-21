@@ -7,6 +7,9 @@ tools:
   - read_file
   - run_terminal_cmd
   - web_search
+skills:
+  - explain-code
+  - security-review
 ---
 
 # Fullstack Debugger
