@@ -1,5 +1,5 @@
 {
-  "name": "shared-ai-library",
+  "name": "agent-registry",
   "private": true,
   "scripts": {
     "sync": "bash scripts/sync.sh"

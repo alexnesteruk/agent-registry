@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Syncs shared-ai-library to all supported AI CLI targets.
+# Syncs agent-registry to all supported AI CLI targets.
 #
 # Global targets:
 #   ~/.opencode/         OpenCode (agents get tools: → permission: translation)
