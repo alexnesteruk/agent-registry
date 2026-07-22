@@ -5,16 +5,27 @@
 #   ~/.opencode/         OpenCode (agents get tools: → permission: translation)
 #   ~/.agents/skills     Antigravity (agents NOT synced — see TODO.md)
 #   ~/.claude/           Claude Code (agents get tools: name translation)
+#   ~/.copilot/agents/   GitHub Copilot custom agents in the IDE (agents get
+#                        tools: name translation, .agent.md extension)
 #   ~/.gemini/GEMINI.md  Gemini (personas only, compiled)
 #
+# All global target dirs (OPENCODE_DIR, ANTIGRAVITY_DIR, CLAUDE_DIR,
+# COPILOT_DIR, GEMINI_DIR) are env-overridable, defaulting to $HOME/.<tool>.
+# This is what makes the script testable without touching real global config:
+# point them at a temp dir and run the whole thing for real.
+#
 # Project-local (this repo only):
-#   .opencode/agents → ../agents  (symlink, created once)
-#   .opencode/skills → ../skills  (symlink, created once)
-#     ^ IDE Copilot extensions that read .opencode/ directly pick up raw
-#       skill files here — not just the compiled instructions below.
 #   .github/copilot-instructions.md  (personas only, compiled — this is
-#     what GitHub Copilot's repo-level instructions feature reads; it does
-#     NOT cover IDE Copilot's own .opencode/ integration, if configured)
+#     what GitHub Copilot's repo-level instructions feature reads; it is
+#     separate from the ~/.copilot/agents/ custom-agent sync above)
+#
+# No project-local .opencode/agents|skills symlink, removed 2026-07-21.
+# It exposed raw, untranslated agent files (tools: as an array) to OpenCode,
+# which hard-crashes every `opencode` command run inside this repo on
+# expert-react-frontend-developer.md's tools: schema. Global ~/.opencode/agents/
+# (translated, above) already covers this repo like every other project,
+# confirmed via `opencode agent list` working identically from ~/workspace
+# and from $HOME, neither of which has a local .opencode/.
 
 set -euo pipefail
 
@@ -28,6 +39,8 @@ SKILLS_DIR="$REGISTRY_DIR/skills"
 OPENCODE_DIR="${OPENCODE_DIR:-$HOME/.opencode}"
 ANTIGRAVITY_DIR="${ANTIGRAVITY_DIR:-$HOME/.agents}"
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+COPILOT_DIR="${COPILOT_DIR:-$HOME/.copilot}"
+GEMINI_DIR="${GEMINI_DIR:-$HOME/.gemini}"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -69,10 +82,20 @@ translate_tools_for_claude() {
 }
 
 # OpenCode's real mechanism (confirmed via opencode.ai/docs/agents) is a
-# `permission:` map (allow/ask/deny), not a `tools:` list — the generic
-# vocabulary's `tools:` key is unrecognized schema and silently ignored,
-# so agents synced without translation fall back to default (likely full)
-# access rather than the intended restricted set.
+# `permission:` map (allow/ask/deny), not a `tools:` list, so the generic
+# vocabulary's `tools:` key is unrecognized schema and must be translated.
+#
+# expert-react-frontend-developer.md is a pre-existing outlier: its `tools:`
+# is an inline array of VS Code/Copilot-specific names (e.g. `tools: ["codebase", ...]`),
+# not this library's generic vocabulary, so none of it maps to a real OpenCode
+# permission. The block-list parser below only recognizes `tools:` followed by
+# indented `- item` lines, so an inline array previously fell through and was
+# silently dropped, leaving the agent with no permission entries for tools at
+# all (confirmed via a test: this granted default/broad OpenCode access instead
+# of the intended restriction, exactly the failure mode this whole translation
+# layer exists to prevent). Since none of its tool names have a real OpenCode
+# equivalent, an inline array is now translated to an explicit deny-all
+# instead: fail safe (no access) rather than fail open (default access).
 translate_tools_for_opencode() {
   awk '
     BEGIN {
@@ -80,20 +103,30 @@ translate_tools_for_opencode() {
       map["write_file"]="edit"
       map["run_terminal_cmd"]="bash"
       map["web_search"]="websearch"
-      in_fm=0; in_tools=0; has_skills=0; n=0
+      in_fm=0; in_tools=0; has_skills=0; inline_tools=0; n=0
     }
     /^---$/ {
       if (in_fm == 0) { in_fm=1; print; next }
-      if (n > 0 || has_skills) {
+      if (n > 0 || has_skills || inline_tools) {
         print "permission:"
         for (i=1; i<=n; i++) print "  " perm[i] ": allow"
         if (has_skills) print "  skill: allow"
+        if (inline_tools) {
+          print "  read: deny"
+          print "  edit: deny"
+          print "  bash: deny"
+          print "  webfetch: deny"
+          print "  websearch: deny"
+        }
       }
       in_fm=0
       print
       next
     }
-    in_fm && /^tools:/ { in_tools=1; next }
+    in_fm && /^tools:/ {
+      if ($0 ~ /\[/) { inline_tools=1 } else { in_tools=1 }
+      next
+    }
     in_fm && in_tools && /^  - / {
       name=$0
       sub(/^  - /, "", name)
@@ -102,6 +135,37 @@ translate_tools_for_opencode() {
     }
     in_fm && in_tools { in_tools=0 }
     in_fm && /^skills:/ { has_skills=1; print; next }
+    { print }
+  ' "$1"
+}
+
+# GitHub Copilot's real mechanism (confirmed via code.visualstudio.com/docs/agent-customization/custom-agents,
+# 2026-07-21) is .agent.md files with a tools: list of its own built-in tool
+# names (readFile, editFiles, runInTerminal, codebase, fetch, etc, NOT the
+# generic vocabulary here). This mapping is a best-effort guess from VS Code
+# docs/blog posts, not empirically confirmed the way Claude's is, and there is
+# no exact Copilot equivalent of a general web_search tool (fetch retrieves
+# a given URL, it doesn't search), so that mapping is the weakest link.
+# Verify against the Tools icon in Copilot Chat before trusting it fully.
+translate_tools_for_copilot() {
+  awk '
+    BEGIN {
+      map["read_file"]="readFile"
+      map["write_file"]="editFiles"
+      map["run_terminal_cmd"]="runInTerminal"
+      map["web_search"]="fetch"
+      in_fm=0; in_tools=0
+    }
+    /^---$/ { in_fm = !in_fm; print; next }
+    in_fm && /^tools:/ { in_tools=1; print; next }
+    in_fm && in_tools && /^  - / {
+      name=$0
+      sub(/^  - /, "", name)
+      if (name in map) print "  - " map[name]
+      else print
+      next
+    }
+    in_fm && in_tools { in_tools=0 }
     { print }
   ' "$1"
 }
@@ -119,19 +183,9 @@ sync_dir() {
   log "Synced $count $label → $dest"
 }
 
-# ── .opencode symlinks (project-local, idempotent) ────────────────────────────
-
-PROJECT_OPENCODE="$REGISTRY_DIR/.opencode"
-mkdir -p "$PROJECT_OPENCODE"
-
-if [[ ! -L "$PROJECT_OPENCODE/agents" ]]; then
-  ln -s ../agents "$PROJECT_OPENCODE/agents"
-  log "Created symlink → .opencode/agents"
-fi
-if [[ ! -L "$PROJECT_OPENCODE/skills" ]]; then
-  ln -s ../skills "$PROJECT_OPENCODE/skills"
-  log "Created symlink → .opencode/skills"
-fi
+# main() wraps the actual sync so this file can be sourced (e.g. by tests) to
+# get the helper/translate functions without running a real sync as a side effect.
+main() {
 
 # ── OpenCode (global) ─────────────────────────────────────────────────────────
 
@@ -203,6 +257,25 @@ for f in "$SKILLS_DIR"/*.md; do
 done
 log "Synced $count skill(s) as commands → $CLAUDE_DIR/commands/"
 
+# ── GitHub Copilot custom agents (global) ────────────────────────────────────
+#
+# User-profile scope (~/.copilot/agents/), not workspace (.github/agents/),
+# to match this project's "agents are global, not per-repo" decision, see
+# project memory. File extension is .agent.md, VS Code/JetBrains' custom-agent
+# format (the renamed successor to .chatmode.md). Confirmed GA for JetBrains
+# IDEs including WebStorm as of the 2026-06-30 GitHub changelog entry.
+
+mkdir -p "$COPILOT_DIR/agents"
+count=0
+for f in "$AGENTS_DIR"/*.md; do
+  [[ -f "$f" ]] || continue
+  agent_name="$(basename "$f" .md)"
+  translate_tools_for_copilot "$f" > "$COPILOT_DIR/agents/$agent_name.agent.md"
+  log "  → $COPILOT_DIR/agents/$agent_name.agent.md (tools translated)"
+  ((count++))
+done
+log "Synced $count agent(s) → $COPILOT_DIR/agents/ (tools translated to Copilot names, .agent.md)"
+
 # ── GitHub Copilot — personas only ───────────────────────────────────────────
 
 COPILOT_FILE="$REGISTRY_DIR/.github/copilot-instructions.md"
@@ -220,7 +293,7 @@ log "Compiled personas → $COPILOT_FILE"
 
 # ── Gemini — personas only ────────────────────────────────────────────────────
 
-GEMINI_FILE="$HOME/.gemini/GEMINI.md"
+GEMINI_FILE="$GEMINI_DIR/GEMINI.md"
 mkdir -p "$(dirname "$GEMINI_FILE")"
 {
   echo "<!-- AUTO-GENERATED by sync.sh — edit files in personas/ -->"
@@ -234,3 +307,9 @@ mkdir -p "$(dirname "$GEMINI_FILE")"
 log "Compiled personas → $GEMINI_FILE"
 
 log "Done."
+
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

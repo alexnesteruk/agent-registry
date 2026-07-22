@@ -130,8 +130,8 @@ You are a world-class expert in React 19.2 with deep knowledge of modern hooks, 
 
 ### Using the `use()` Hook (React 19)
 
-```typescript
-import {use, Suspense} from "react";
+```
+import {Suspense, use} from "react";
 
 interface User {
   id: number;
@@ -140,20 +140,22 @@ interface User {
 }
 
 async function fetchUser(id: number): Promise<User> {
-  const res = await fetch(`https://api.example.com/users/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch user");
-  return res.json();
+  const response = await fetch(`https://api.example.com/users/${id}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch user");
+  }
+
+  return response.json();
 }
 
 function UserProfile({userPromise}: { userPromise: Promise<User> }) {
-  // use() hook suspends rendering until promise resolves
   const user = use(userPromise);
 
   return (
     <div>
-      <h2>{user.name} < /h2>
-    < p > {user.email} < /p>
-    < /div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
   );
 }
 
@@ -161,36 +163,28 @@ export function UserProfilePage({userId}: { userId: number }) {
   const userPromise = fetchUser(userId);
 
   return (
-    <Suspense fallback = { < div > Loading
-  user
-...
-  </div>}>
-  < UserProfile
-  userPromise = {userPromise}
-  />
-  < /Suspense>
-)
-  ;
+    <Suspense fallback={<div>Loading user...</div>}>
+      <UserProfile userPromise={userPromise} />
+    </Suspense>
+  );
 }
 ```
 
 ### Form with Actions and useFormStatus (React 19)
 
-```typescript
-import {useFormStatus} from "react-dom";
+```
 import {useActionState} from "react";
+import {useFormStatus} from "react-dom";
 
 // Submit button that shows pending state
 function SubmitButton() {
   const {pending} = useFormStatus();
 
   return (
-    <button type = "submit"
-  disabled = {pending} >
+    <button type="submit" disabled={pending}>
     {pending ? "Submitting..." : "Submit"}
-    < /button>
-)
-  ;
+    </button>
+  );
 }
 
 interface FormState {
@@ -226,30 +220,23 @@ export function CreatePostForm() {
   const [state, formAction] = useActionState(createPost, {});
 
   return (
-    <form action = {formAction} >
-    <input name = "title"
-  placeholder = "Title"
-  required / >
-  <textarea name = "content"
-  placeholder = "Content"
-  required / >
+    <form action={formAction}>
+      <input name="title" placeholder="Title" required />
+      <textarea name="content" placeholder="Content" required />
 
-  {state.error && <p className = "error" > {state.error} < /p>}
-  {
-    state.success && <p className = "success" > Post
-    created! < /p>}
+      {state.error && <p className="error">{state.error}</p>}
+      {state.success && <p className="success">Post created!</p>}
 
-    < SubmitButton / >
+      <SubmitButton />
     </form>
-  )
-    ;
-  }
+  );
+}
 ```
 
 ### Optimistic Updates with useOptimistic (React 19)
 
-```typescript
-import {useState, useOptimistic, useTransition} from "react";
+```
+import {useOptimistic, useState, useTransition} from "react";
 
 interface Message {
   id: string;
@@ -268,7 +255,10 @@ async function sendMessage(text: string): Promise<Message> {
 
 export function MessageList({initialMessages}: { initialMessages: Message[] }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [optimisticMessages, addOptimisticMessage] = useOptimistic(messages, (state, newMessage: Message) => [...state, newMessage]);
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    messages,
+    (state, newMessage: Message) => [...state, newMessage],
+  );
   const [isPending, startTransition] = useTransition();
 
   const handleSend = async (text: string) => {
@@ -287,28 +277,22 @@ export function MessageList({initialMessages}: { initialMessages: Message[] }) {
     });
   };
 
-  return (
-    <div>
-      {
-        optimisticMessages.map((msg) => (
-          <div key = {msg.id} className = {msg.sending ? "opacity-50" : ""} >
-          {msg.text}
-          < /div>
-  )
-)
-}
-  <MessageInput onSend = {handleSend}
-  disabled = {isPending}
-  />
-  < /div>
-)
-  ;
+ return (
+   <div>
+     {optimisticMessages.map((msg) => (
+       <div key={msg.id} className={msg.sending ? "opacity-50" : ""}>
+         {msg.text}
+       </div>
+     ))}
+     <MessageInput onSend={handleSend} disabled={isPending} />
+   </div>
+ );
 }
 ```
 
 ### Using useEffectEvent (React 19.2)
 
-```typescript
+```
 import {useState, useEffect, useEffectEvent} from "react";
 
 interface ChatProps {
@@ -339,97 +323,62 @@ export function ChatRoom({roomId, theme}: ChatProps) {
   }, [roomId]); // theme not in dependencies!
 
   return (
-    <div className = {theme} >
-      {
-        messages.map((msg, i) => (
-          <div key = {i} > {msg} < /div>
-        ))
-      }
-      < /div>
+    <div className={theme}>
+      {messages.map((msg, i) => (
+        <div key={i}>{msg}</div>
+      ))}
+    </div>
   );
 }
 ```
 
 ### Using <Activity> Component (React 19.2)
 
-```typescript
+```
 import {Activity, useState} from "react";
 
 export function TabPanel() {
   const [activeTab, setActiveTab] = useState<"home" | "profile" | "settings">("home");
 
-  return (
-    <div>
-      <nav>
-        <button onClick = {()
-=>
-  setActiveTab("home")
-}>
-  Home < /button>
-  < button
-  onClick = {()
-=>
-  setActiveTab("profile")
-}>
-  Profile < /button>
-  < button
-  onClick = {()
-=>
-  setActiveTab("settings")
-}>
-  Settings < /button>
-  < /nav>
+ return (
+   <div>
+     <nav>
+       <button onClick={() => setActiveTab("home")}>Home</button>
+       <button onClick={() => setActiveTab("profile")}>Profile</button>
+       <button onClick={() => setActiveTab("settings")}>Settings</button>
+     </nav>
 
-  {/* Activity preserves UI and state when hidden */
-  }
-  <Activity mode = {activeTab === "home" ? "visible" : "hidden"
-}>
-  <HomeTab / >
-  </Activity>
+     <Activity mode={activeTab === "home" ? "visible" : "hidden"}>
+       <HomeTab />
+     </Activity>
 
-  < Activity
-  mode = {activeTab === "profile" ? "visible" : "hidden"
-}>
-  <ProfileTab / >
-  </Activity>
+     <Activity mode={activeTab === "profile" ? "visible" : "hidden"}>
+       <ProfileTab />
+     </Activity>
 
-  < Activity
-  mode = {activeTab === "settings" ? "visible" : "hidden"
-}>
-  <SettingsTab / >
-  </Activity>
-  < /div>
-)
-  ;
+     <Activity mode={activeTab === "settings" ? "visible" : "hidden"}>
+       <SettingsTab />
+     </Activity>
+   </div>
+ );
 }
 
 function HomeTab() {
   // State is preserved when tab is hidden and restored when visible
   const [count, setCount] = useState(0);
 
-  return (
-    <div>
-      <p>Count
-:
-  {
-    count
-  }
-  </p>
-  < button
-  onClick = {()
-=>
-  setCount(count + 1)
-}>
-  Increment < /button>
-  < /div>
-)
-  ;
+ return (
+   <div>
+     <p>Count: {count}</p>
+     <button onClick={() => setCount(count + 1)}>Increment</button>
+   </div>
+ );
 }
 ```
 
 ### Custom Hook with TypeScript Generics
 
-```typescript
+```
 import {useState, useEffect} from "react";
 
 interface UseFetchResult<T> {
@@ -488,32 +437,23 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
 function UserList() {
   const {data, loading, error} = useFetch<User[]>("https://api.example.com/users");
 
-  if (loading) return <div>Loading
-...
-  </div>;
-  if (error) return <div>Error
-:
-  {
-    error.message
-  }
-  </div>;
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
   if (!data) return null;
 
   return (
     <ul>
-      {
-        data.map((user) => (
-          <li key = {user.id} > {user.name} < /li>
-        ))
-      }
-    < /ul>
+      {data.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
   );
 }
 ```
 
 ### Error Boundary with TypeScript
 
-```typescript
+```
 import {Component, ErrorInfo, ReactNode} from "react";
 
 interface Props {
@@ -545,26 +485,18 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div role = "alert" >
-            <h2>Something
-      went
-      wrong < /h2>
-      < details >
-      <summary>Error
-      details < /summary>
-      < pre > {this.state.error?.message} < /pre>
-      < /details>
-      < button
-      onClick = {()
-    =>
-      this.setState({hasError: false, error: null})
-    }>
-      Try
-      again < /button>
-      < /div>
-    )
-    )
-      ;
+          <div role="alert">
+            <h2>Something went wrong</h2>
+            <details>
+              <summary>Error details</summary>
+              <pre>{this.state.error?.message}</pre>
+            </details>
+            <button onClick={() => this.setState({hasError: false, error: null})}>
+              Try again
+            </button>
+          </div>
+        )
+      );
     }
 
     return this.props.children;
@@ -574,7 +506,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
 ### Using cacheSignal for Resource Cleanup (React 19.2)
 
-```typescript
+```
 import {cache, cacheSignal} from "react";
 
 // Cache with automatic cleanup when cache expires
@@ -596,7 +528,7 @@ const fetchUserData = cache(async (userId: string) => {
     if (!response.ok) throw new Error("Failed to fetch user");
     return await response.json();
   } catch (error) {
-    if (error.name === "AbortError") {
+    if (error instanceof DOMException && error.name === "AbortError") {
       console.log("Fetch aborted due to cache expiration");
     }
     throw error;
@@ -609,27 +541,27 @@ function UserProfile({userId}: { userId: string }) {
 
   return (
     <div>
-      <h2>{user.name} < /h2>
-    < p > {user.email} < /p>
-    < /div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
   );
 }
 ```
 
 ### Ref as Prop - No More forwardRef (React 19)
 
-```typescript
+```
+import {useRef} from "react";
+
 // React 19: ref is now a regular prop!
 interface InputProps {
   placeholder?: string;
-  ref?: React.Ref<HTMLInputElement>; // ref is just a prop now
+  ref?: React.Ref<HTMLInputElement>;
 }
 
 // No need for forwardRef anymore
 function CustomInput({placeholder, ref}: InputProps) {
-  return <input ref = {ref}
-  placeholder = {placeholder}
-  className = "custom-input" / >;
+  return <input ref={ref} placeholder={placeholder} className="custom-input" />;
 }
 
 // Usage
@@ -642,19 +574,16 @@ function ParentComponent() {
 
   return (
     <div>
-      <CustomInput ref = {inputRef}
-  placeholder = "Enter text" / >
-  <button onClick = {focusInput} > Focus
-  Input < /button>
-  < /div>
-)
-  ;
+      <CustomInput ref={inputRef} placeholder="Enter text" />
+      <button onClick={focusInput}>Focus Input</button>
+    </div>
+  );
 }
 ```
 
 ### Context Without Provider (React 19)
 
-```typescript
+```
 import {createContext, useContext, useState} from "react";
 
 interface ThemeContextType {
@@ -678,11 +607,11 @@ function App() {
   // Old way: <ThemeContext.Provider value={value}>
   // New way in React 19: Render context directly
   return (
-    <ThemeContext value = {value} >
-      <Header / >
-      <Main / >
-      <Footer / >
-      </ThemeContext>
+    <ThemeContext value={value}>
+      <Header />
+      <Main />
+      <Footer />
+    </ThemeContext>
   );
 }
 
@@ -691,18 +620,16 @@ function Header() {
   const {theme, toggleTheme} = useContext(ThemeContext)!;
 
   return (
-    <header className = {theme} >
-    <button onClick = {toggleTheme} > Toggle
-  Theme < /button>
-  < /header>
-)
-  ;
+    <header className={theme}>
+      <button onClick={toggleTheme}>Toggle Theme</button>
+    </header>
+  );
 }
 ```
 
 ### Ref Callback with Cleanup Function (React 19)
 
-```typescript
+```
 import {useState} from "react";
 
 function VideoPlayer() {
@@ -735,113 +662,67 @@ function VideoPlayer() {
     }
   };
 
-  return (
-    <div>
-      <video ref = {videoRef}
-  src = "/video.mp4"
-  controls / >
-  <button onClick = {()
-=>
-  setIsPlaying(!isPlaying)
-}>
-  {
-    isPlaying ? "Pause" : "Play"
+    return (
+   <div>
+     <video ref={videoRef} src="/video.mp4" controls />
+     <button onClick={() => setIsPlaying(!isPlaying)}>
+       {isPlaying ? "Pause" : "Play"}
+     </button>
+   </div>
+    );
   }
-  </button>
-  < /div>
-)
-  ;
-}
-```
+  ```
 
 ### Document Metadata in Components (React 19)
 
-```typescript
+```
 // React 19: Place metadata directly in components
 // React will automatically hoist these to <head>
 function BlogPost({post}: { post: Post }) {
   return (
     <article>
       {/* These will be hoisted to <head> */}
-    < title > {post.title} - My
-  Blog < /title>
-  < meta
-  name = "description"
-  content = {post.excerpt}
-  />
-  < meta
-  property = "og:title"
-  content = {post.title}
-  />
-  < meta
-  property = "og:description"
-  content = {post.excerpt}
-  />
-  < link
-  rel = "canonical"
-  href = {`https://myblog.com/posts/${post.slug}`
-}
-  />
+      <title>{post.title} - My Blog</title>
+      <meta name="description" content={post.excerpt} />
+      <meta property="og:title" content={post.title} />
+      <meta property="og:description" content={post.excerpt} />
+      <link rel="canonical" href={`https://myblog.com/posts/${post.slug}`} />
 
-  {/* Regular content */
-  }
-  <h1>{post.title} < /h1>
-  < div
-  dangerouslySetInnerHTML = {
-  {
-    __html: post.content
-  }
-}
-  />
-  < /article>
-)
-  ;
+      <h1>{post.title}</h1>
+      <div dangerouslySetInnerHTML={{__html: post.content}} />
+    </article>
+  );
 }
 ```
 
 ### useDeferredValue with Initial Value (React 19)
 
-```typescript
-import {useState, useDeferredValue, useTransition} from "react";
+```
+import {useDeferredValue, useState, useTransition} from "react";
 
 interface SearchResultsProps {
   query: string;
 }
 
 function SearchResults({query}: SearchResultsProps) {
-  // React 19: useDeferredValue now supports initial value
-  // Shows "Loading..." initially while first deferred value loads
-  const deferredQuery = useDeferredValue(query, "Loading...");
+  const deferredQuery = useDeferredValue(query);
 
   const results = useSearchResults(deferredQuery);
 
   return (
     <div>
-      <h3>Results
-  for:
-  {
-    deferredQuery
-  }
-  </h3>
-  {
-    deferredQuery === "Loading..." ? (
-      <p>Preparing search
-  ...
-    </p>
-  ) :
-    (
-      <ul>
-        {
-          results.map((result) => (
-            <li key = {result.id} > {result.title} < /li>
-          ))
-        }
-      < /ul>
-    )
-  }
-  </div>
-)
-  ;
+      <h3>Results for: {deferredQuery}</h3>
+      {deferredQuery ? (
+        <ul>
+          {results.map((result) => (
+            <li key={result.id}>{result.title}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>Preparing search...</p>
+      )}
+    </div>
+  );
 }
 
 function SearchApp() {
@@ -854,23 +735,17 @@ function SearchApp() {
     });
   };
 
-  return (
-    <div>
-      <input type = "search"
-  onChange = {(e)
-=>
-  handleSearch(e.target.value)
-}
-  placeholder = "Search..." / >
-    {isPending && <span>Searching
-...
-  </span>}
-  < SearchResults
-  query = {query}
-  />
-  < /div>
-)
-  ;
+ return (
+   <div>
+     <input
+       type="search"
+       onChange={(e) => handleSearch(e.target.value)}
+       placeholder="Search..."
+     />
+     {isPending && <span>Searching...</span>}
+     <SearchResults query={query} />
+   </div>
+ );
 }
 ```
 
