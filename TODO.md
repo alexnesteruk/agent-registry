@@ -56,3 +56,36 @@ Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed
 against real source content with every global dir redirected to a temp directory. Run
 with `bash scripts/sync.test.sh`. `sync.sh` is sourceable without side effects (`main()`
 only runs when executed directly) specifically so this works.
+
+## Future directions (added 2026-07-25)
+
+Candidate next steps, roughly in priority order based on cost against benefit:
+
+- **Migrate to npmjs.** Active goal, not just a maybe. Requires generalizing away from
+  the hardcoded `$HOME`-relative path assumptions in `sync.sh` (`OPENCODE_DIR` etc.
+  default to `$HOME/.opencode` and friends, fine for one machine, not fine as a published
+  package), picking a package name, deciding whether it needs a `bin` entry for `npx`
+  invocation, and writing docs for someone who isn't this specific setup. Overlaps
+  heavily with "package for external/team use" below, they're effectively the same work.
+- **Package for external/team use.** Same underlying work as the npm migration: drop
+  the single-user/`$HOME`-scoped assumptions, expand past the current README, handle
+  config for a user whose target directories or CLI set differ from this machine's.
+- **More sync targets** (Cursor, Windsurf, Zed, Cline, etc.). Benefit is the core value
+  proposition, one edit propagates everywhere, but cost compounds per target: every
+  tool's real mechanism has been a surprise so far (OpenCode's `permission:` map,
+  Copilot's `tools:` schema, Antigravity's still-unverified enforcement above), so each
+  addition is its own research-and-verify cycle plus a translator plus test coverage,
+  not a copy-paste.
+- **Auto-sync on save** (git hook or file watcher instead of remembering to run
+  `sync.sh`). Low cost, direct benefit: removes the one manual step that's already
+  caused real drift (the stale `SandBox17/.opencode` copy existed because nothing
+  forced a re-sync, see "Other known gaps" above).
+- **CI validation** (run `sync.test.sh` in a GitHub Action on push). Low cost since the
+  test suite already exists. Catches a translator regression before it reaches the real
+  `~/.claude`/`~/.opencode`/etc. targets, instead of only being caught by hand, which is
+  how the OpenCode crash and the silent tools-dropping bug were both found.
+- **Extend beyond agents/skills/personas to MCP server configs.** There's already a real
+  MCP entry wired into `~/.opencode/config.json` pointing at the sibling
+  `agent-registry-mcp` repo. Folding that config into the same source-of-truth/sync
+  pattern is a moderate lift but closes a real gap, that config isn't versioned or
+  reproducible anywhere right now.
