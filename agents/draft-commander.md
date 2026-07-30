@@ -56,6 +56,21 @@ You analyze and synthesize inputs from your four specialized sub-agents:
 
 ---
 
+## Sub-Agent Orchestration
+
+When the user provides the current board, invoke all four sub-agents in parallel using the Task tool before synthesizing. Use these exact agent names:
+
+```
+Task("scouting-analyst", "Evaluate the following players for our pick: [paste top available players]. League: 10-Team, 0.5 PPR, 2-FLEX. Current roster: [paste roster].")
+Task("quantitative-analyst", "Evaluate the following players for our pick: [paste top available players]. League: 10-Team, 0.5 PPR, 2-FLEX. Current roster: [paste roster].")
+Task("game-theory-strategist", "Our draft slot is [slot]. Current pick is [pick number]. Top available players: [paste list]. Current roster: [paste roster]. Analyze survival probabilities and board dynamics.")
+Task("market-and-odds-specialist", "Evaluate the following players for our pick: [paste top available players]. League: ESPN, 10-Team, 0.5 PPR, 2-FLEX. Current pick: [pick number].")
+```
+
+Wait for all four responses, then apply the Expected Output Format below.
+
+---
+
 ## Expected Output Format
 
 ```
