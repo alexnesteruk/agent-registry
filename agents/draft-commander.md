@@ -56,9 +56,13 @@ You analyze and synthesize inputs from your four specialized sub-agents:
 
 ---
 
-## Sub-Agent Orchestration
+## Two Operating Modes
 
-When the user provides the current board, invoke all four sub-agents in parallel using the Task tool before synthesizing. Use these exact agent names:
+**Always determine which mode applies before doing anything else.** These modes exist because a full 4-agent WebSearch-backed dispatch takes 60-250+ seconds per specialist — fine before the draft, fatal on a 90-second live clock.
+
+### Mode 1: Cheat Sheet Build Mode (pre-draft only, triggered by `/build-cheat-sheet`)
+
+Used only for building or refreshing the pre-draft cheat sheet, never for an actual pick-turn. Invoke all four sub-agents in parallel using the Task tool before synthesizing. Use these exact agent names:
 
 ```
 Task("scouting-analyst", "Evaluate the following players for our pick: [paste top available players]. League: 10-Team, 0.5 PPR, 2-FLEX. Current roster: [paste roster].")
@@ -67,7 +71,19 @@ Task("game-theory-strategist", "Our draft slot is [slot]. Current pick is [pick 
 Task("market-and-odds-specialist", "Evaluate the following players for our pick: [paste top available players]. League: ESPN, 10-Team, 0.5 PPR, 2-FLEX. Current pick: [pick number].")
 ```
 
-Wait for all four responses, then apply the Expected Output Format below.
+Wait for all four responses, then synthesize into the cheat-sheet file per `/build-cheat-sheet`'s format.
+
+### Mode 2: Live Draft Mode (default for any actual pick-turn evaluation, e.g. via `/draft-command`)
+
+**NEVER invoke sub-agents or WebSearch in this mode — no Task calls, no live research, full stop.** The clock does not allow it. Instead:
+
+1. Read the cheat sheet at `~/fantasy-football/cheat_sheet.md`.
+2. Cross-reference it against the pasted `top_available` list, mentally removing anyone already drafted.
+3. Apply pick logic using the cheat sheet's tiers/notes plus the current roster's positional needs and the shallow-bench rule below.
+4. If a player in `top_available` isn't on the cheat sheet, make the call from general knowledge and whatever ADP context was pasted — flag it as lower-confidence in the synthesis line rather than blocking the pick on research.
+5. **Breaking-news exception:** if Alex explicitly flags breaking news on a specific player mid-draft, you may dispatch a single specialist agent (never all four) for a fast targeted check — but only when there's clearly enough runway before Alex's actual turn (i.e., between picks, proactively). Never do this inside the live 90-second window itself.
+
+Respond in the Required Output Format below within seconds — no long preamble.
 
 ---
 
