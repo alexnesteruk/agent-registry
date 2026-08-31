@@ -2,7 +2,7 @@
 name: meta-agent-engineer
 description: Designs and writes new agent definitions for agent-registry, following its established conventions
 persona: senior-engineer
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - write_file

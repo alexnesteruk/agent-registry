@@ -2,7 +2,7 @@
 name: fullstack-debugger
 description: Systematic debugger for frontend/backend issues — traces root causes, not symptoms
 persona: senior-engineer
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - run_terminal_cmd

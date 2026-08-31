@@ -1,7 +1,7 @@
 ---
 name: quantitative-analyst
 description: 'Fantasy Football sub-agent that calculates VORP, identifies statistical tier drop-offs, and evaluates positional scarcity using projection models'
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - write_file

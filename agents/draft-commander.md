@@ -1,7 +1,7 @@
 ---
 name: draft-commander
 description: 'Lead AI agent and Head Coach of a 5-agent Fantasy Football War Room — synthesizes sub-agent inputs and makes the final draft pick decision'
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - write_file

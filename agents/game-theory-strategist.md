@@ -1,7 +1,7 @@
 ---
 name: game-theory-strategist
 description: 'Fantasy Football sub-agent that calculates player survival probabilities, predicts positional runs, and enforces macro draft structure strategy'
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - write_file

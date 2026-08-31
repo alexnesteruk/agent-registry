@@ -1,7 +1,7 @@
 ---
 name: scouting-analyst
 description: 'Fantasy Football sub-agent that evaluates coaching schemes, injury status, depth chart battles, and qualitative film context for draft decisions'
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - write_file

@@ -1,7 +1,7 @@
 ---
 name: market-and-odds-specialist
 description: 'Fantasy Football sub-agent that exploits ADP inefficiencies and translates Vegas prop bets into actionable draft value signals'
-model: claude-sonnet-4-6
+model: claude-sonnet-5
 tools:
   - read_file
   - write_file
