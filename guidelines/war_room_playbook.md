@@ -41,7 +41,7 @@ The War Room uses a hierarchical 4+1 agent structure designed to prevent consens
 
 ### Mode 2: Live Draft War Room (`/draft-command`)
 * **When:** Live draft night (Sep 7, 2026 @ 8:00 PM EDT) under the **90-second pick clock**.
-* **Execution:** **Instant cheat sheet lookup (<2 seconds).** Zero WebSearch or live sub-agent dispatch calls.
+* **Execution:** **Instant cheat sheet lookup (<2 seconds).** Zero WebSearch or live sub-agent dispatch calls. The deterministic `scripts/snitch_risk.py` calculator IS allowed on the clock (it's a fast local script, not a dispatch) — invoke it by absolute path: `python3 ~/workspace/agent-registry/scripts/snitch_risk.py`.
 * **Exception:** A single targeted specialist check is allowed ONLY if breaking news occurs with ample runway (>3 minutes) before Alex's turn.
 
 ---
@@ -52,8 +52,8 @@ The War Room uses a hierarchical 4+1 agent structure designed to prevent consens
    * While the other 8 managers pick between Alex's turns (e.g., between pick 22 and pick 39), Alex pastes recent picks and the top available board.
    * War Room updates the queue and preps recommendations before Alex is on the clock.
 2. **On-The-Clock Window (90 seconds):**
-   * Alex triggers `/draft-command` with the top available names.
-   * War Room returns: **PRIMARY TARGET**, **CONTINGENCY / PIVOT**, and **ONE-SENTENCE RATIONALE** instantly.
+   * Alex triggers `/draft-command` with the pick number, current roster, and top-available board (one free-text blob — the skill parses it).
+   * War Room returns the skill's fixed output block instantly: **THE PICK**, **THE RUNNER-UP**, **COMMANDER'S SYNTHESIS**, **ROSTER CHECK**, **ON THE HORIZON (NEXT TURN)**. (This is the authoritative live-output contract — defined in `skills/draft-command.md`.)
 
 ---
 

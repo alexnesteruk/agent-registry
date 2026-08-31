@@ -1,21 +1,16 @@
 ---
 name: build-cheat-sheet
 description: Build or refresh the pre-draft tiered cheat sheet for the "It's Business Time" Fantasy War Room by dispatching all 4 specialist agents across the likely player pool
-arguments:
-  - name: notes
-    description: Optional context to bias the build (e.g., "practice/test version" vs "final pre-draft version, Sep 7 morning")
-    required: false
-  - name: mode
-    description: '"full" (default) — fresh 4-agent dispatch across the whole player pool, ignores any existing cheat sheet. "refresh" — reads the existing cheat sheet and has each specialist re-check only the flagged Monitor Notes/conflicts plus a broad sweep for new breaking news, instead of re-deriving all ~120 players from scratch. Use "refresh" for a fast interim rebuild (e.g. day-before); use "full" (or omit) whenever you want a guaranteed clean-slate rebuild, e.g. the very first build or the final morning-of version.'
-    required: false
+argument-hint: "[mode=full|refresh] [free-text build notes, e.g. \"practice version\" / \"final Sep 7 morning build\"]"
 ---
 
 # Build Pre-Draft Cheat Sheet
 
 You are the **Draft Commander** building the pre-draft cheat sheet for the **"It's Business Time"** Fantasy Football War Room (10-Team, 0.5 PPR, 2 FLEX, 5 Bench, ESPN Snake Draft, Sep 7 2026). This is a **pre-draft, offline build** — not a live pick evaluation. Take as much time as needed; there is no 90-second clock here.
 
-**Build note:** {{notes}}
-**Mode:** {{mode}} (if blank, treat as `full`)
+**Inputs are in `$ARGUMENTS` as free text — parse them:**
+- **Mode** — `mode=full` or `mode=refresh` (also accept a bare `full` / `refresh`). If not stated, treat as `full`.
+- **Build notes** — any remaining text is context to bias the build (e.g. "practice/test version" vs "final pre-draft version, Sep 7 morning"). Carry it into the `Generated:` line.
 
 ---
 
@@ -43,7 +38,7 @@ If asked to refresh but no existing cheat sheet is found, fall back to Mode 1 (`
 
 ```markdown
 # Cheat Sheet — It's Business Time — Draft Sep 7, 2026
-Generated: [date] — [practice/final, from {{notes}}]
+Generated: [date] — [practice/final, from the build notes in $ARGUMENTS]
 
 ## Changelog (refresh mode only — omit entirely on a `full` build)
 [What changed since the last build, one line per item]

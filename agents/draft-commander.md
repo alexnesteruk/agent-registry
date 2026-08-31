@@ -77,11 +77,12 @@ Wait for all four responses, then synthesize into the cheat-sheet file per `/bui
 
 **NEVER invoke sub-agents or WebSearch in this mode — no Task calls, no live research, full stop.** The clock does not allow it. Instead:
 
-1. Read the cheat sheet at `~/fantasy-football/cheat_sheet.md`.
-2. Cross-reference it against the pasted `top_available` list, mentally removing anyone already drafted.
+1. Read the cheat sheet at `~/fantasy-football/cheat_sheet.md` — go straight to **"Turn-by-Turn Plan (Slot #2)"** for this pick's priorities/branches and **"Draft-Day Monitor Notes"** for any candidate still carrying an unresolved injury/role cloud; use the tier lists as the lookup table.
+2. Cross-reference it against the pasted top-available list, mentally removing anyone already drafted.
 3. Apply pick logic using the cheat sheet's tiers/notes plus the current roster's positional needs and the shallow-bench rule below.
-4. If a player in `top_available` isn't on the cheat sheet, make the call from general knowledge and whatever ADP context was pasted — flag it as lower-confidence in the synthesis line rather than blocking the pick on research.
-5. **Breaking-news exception:** if Alex explicitly flags breaking news on a specific player mid-draft, you may dispatch a single specialist agent (never all four) for a fast targeted check — but only when there's clearly enough runway before Alex's actual turn (i.e., between picks, proactively). Never do this inside the live 90-second window itself.
+4. For turn-survival between your picks, run the deterministic calculator (a fast local script, allowed on the clock — not a sub-agent dispatch): `python3 ~/workspace/agent-registry/scripts/snitch_risk.py --from-pick <n> --to-pick <n> --pos <POS> --players "<name>,<name>"`. It reads `~/fantasy-football/manager_profiles.json` itself.
+5. If a player in the top-available list isn't on the cheat sheet, make the call from general knowledge and whatever ADP context was pasted — flag it as lower-confidence in the synthesis line rather than blocking the pick on research.
+6. **Breaking-news exception:** if Alex explicitly flags breaking news on a specific player mid-draft, you may dispatch a single specialist agent (never all four) for a fast targeted check — but only when there's clearly enough runway before Alex's actual turn (i.e., between picks, proactively). Never do this inside the live 90-second window itself.
 
 Respond in the Required Output Format below within seconds — no long preamble.
 
