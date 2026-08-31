@@ -13,7 +13,7 @@ This is a session-start status briefing, not a fresh analysis — don't dispatch
 
 ## Directives
 
-1. **Reload memory**: read the three fantasy-football memory files in full — `ff_league_settings.md`, `ff_draft_slot_decision.md`, `ff_war_room_workflow.md` (path: `~/.claude/projects/-Users-alexnesteruk/memory/`).
+1. **Reload domain data**: read the three fantasy-football knowledge files in full — `league_settings.md`, `draft_slot_decision.md`, `opponents.md` (path: `~/fantasy-football/`). History/comedy files (`~/fantasy-football/history/`) are archival only — do not load them here; they're decoupled from draft-prep on purpose.
 2. **Check the agent-registry repo** (`~/workspace/agent-registry`) for uncommitted changes via `git status --short` — report anything still pending (e.g. a prior edit never committed).
 3. **Check the cheat sheet**: does `~/fantasy-football/cheat_sheet.md` exist? If so, read its `Generated:` line and its `Draft-Day Monitor Notes` / `Changelog` section. Flag if it's stale (built before today) and note it should be rebuilt via `/build-cheat-sheet` (mode=`refresh` for a quick check, mode=`full` for the real Sep 7 morning build).
 4. **Compute days remaining** until the draft (Sep 7, 2026, 8:00 PM EDT) from today's date.

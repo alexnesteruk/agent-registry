@@ -40,10 +40,12 @@ You are the **Draft Commander** executing a pick turn in the **"It's Business Ti
 
 ## Evaluation Directives
 
-1. **Cross-Reference the Cheat Sheet** (not fresh synthesis):
+1. **Cross-Reference the Cheat Sheet & Snitch Risk**:
    - Pull the relevant tier/note for each candidate from `~/fantasy-football/cheat_sheet.md` — Scouting (health/scheme), Quant (VORP/tier cliffs), Market (ADP arbitrage), and Game Theory (turn survival, 2-FLEX structure) lenses are already baked into those notes.
+   - For turn survival between odd/even turns (e.g. Pick 19 ➔ Pick 22 vs. Pick 22 ➔ Pick 39), reference `~/fantasy-football/manager_profiles.json` or run `scripts/snitch_risk.py` for deterministic snitch risk.
 2. **Enforce Shallow Bench Discipline**:
    - Do NOT draft a backup QB, backup TE, or D/ST unless late in the draft. Prioritize RB/WR starting & upside depth.
+
 
 ---
 
