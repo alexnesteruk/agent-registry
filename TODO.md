@@ -27,11 +27,11 @@ is, or dropped from what's synced to avoid implying a restriction that isn't rea
 
 ## Verify GitHub Copilot custom-agent `tools:` mapping (added 2026-07-21)
 
-`translate_tools_for_copilot` in `scripts/sync.sh` maps `read_file`/`write_file`/`run_terminal_cmd`/`web_search` to `readFile`/`editFiles`/`runInTerminal`/`fetch`. Unlike Claude Code's mapping, this one is a best-effort guess from VS Code docs/blog posts, not empirically confirmed by observing an actual agent run. `web_search → fetch` is the weakest part: Copilot has no true web-search built-in, `fetch` only retrieves a specific URL.
+`translate_tools_for_copilot` in `scripts/sync.sh` maps `read_file`/`write_file`/`run_terminal_cmd`/`web_search` to `readFile`/`editFiles`/`runInTerminal`/`fetch`. Unlike Claude Code's mapping, th[...]
 
-Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed through untranslated, since its `tools:` already uses Copilot-style names) contains `"edit/editFiles"`. This exact prefixed notation is called out in a live GitHub issue (`microsoft/vscode-copilot-release#14104`, "Configure Tools UI writes incorrect tool names with prefix notation, corrupting custom agent files") as not recognized by the agent system. If that's accurate, this agent may silently be missing edit access in Copilot right now.
+Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed through untranslated, since its `tools:` already uses Copilot-style names) contains `"edit/editFiles"`. This exact [...]
 
-**How to verify:** open a synced agent (e.g. `angular-developer`) in Copilot Chat in WebStorm or VS Code, check the Tools icon to see which of its listed tools actually resolve vs. show as unrecognized. For the `edit/editFiles` case specifically, check whether `expert-react-frontend-developer` can actually edit files when invoked, or fix it to plain `editFiles` if the prefix form is confirmed broken.
+**How to verify:** open a synced agent (e.g. `angular-developer`) in Copilot Chat in WebStorm or VS Code, check the Tools icon to see which of its listed tools actually resolve vs. show as unrecog[...]
 
 ## Other known gaps
 
@@ -52,7 +52,7 @@ Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed
 ## Testing
 
 `scripts/sync.test.sh` covers the translate_tools_for_* / strip_frontmatter functions
-(fixture-based unit tests) plus one integration test that runs the real `main()` sync
+(fixture-based unit tests) plus one integration test that runs the real `sync()`
 against real source content with every global dir redirected to a temp directory. Run
 with `bash scripts/sync.test.sh`. `sync.sh` is sourceable without side effects (`main()`
 only runs when executed directly) specifically so this works.
@@ -61,29 +61,76 @@ only runs when executed directly) specifically so this works.
 
 Candidate next steps, roughly in priority order based on cost against benefit:
 
-- **Migrate to npmjs.** Active goal, not just a maybe. Requires generalizing away from
-  the hardcoded `$HOME`-relative path assumptions in `sync.sh` (`OPENCODE_DIR` etc.
-  default to `$HOME/.opencode` and friends, fine for one machine, not fine as a published
-  package), picking a package name, deciding whether it needs a `bin` entry for `npx`
-  invocation, and writing docs for someone who isn't this specific setup. Overlaps
-  heavily with "package for external/team use" below, they're effectively the same work.
-- **Package for external/team use.** Same underlying work as the npm migration: drop
-  the single-user/`$HOME`-scoped assumptions, expand past the current README, handle
-  config for a user whose target directories or CLI set differ from this machine's.
+- **[ACTIVE PLANNING] Migrate to npmjs (added 2026-08-31).** Strategic priority: convert
+  shell scripts to Node.js/npm for cross-platform support, better maintainability, and
+  alignment with emerging standards. Will unlock Windows users, npm registry discoverability,
+  and clearer path to `gh skill` compatibility.
+  
+  **Phase 1: Rewrite sync logic in JavaScript (2-3 days)**
+  - [ ] Create `package.json` with dependencies (js-yaml, chalk, etc.)
+  - [ ] Rewrite `scripts/sync.sh` → `src/sync.js` (1:1 feature parity)
+  - [ ] Rewrite `scripts/sync.test.sh` → `test/sync.test.js` (Jest or Vitest)
+  - [ ] Add platform detection for Windows/macOS/Linux
+  - [ ] Handle path normalization (use `path` module instead of bash)
+  - [ ] Ensure tool translation logic maps 1:1 from shell version
+  
+  **Phase 2: npm distribution & CLI (1 day)**
+  - [ ] Add `bin` entry point in package.json → `bin/agent-registry.js`
+  - [ ] Publish to npm registry
+  - [ ] Test global install: `npm install -g agent-registry`
+  - [ ] Create install/setup guide for npm users vs. git clone users
+  - [ ] Add `.npmignore` to exclude source scripts
+  
+  **Phase 3: Advanced features & config (3-5 days)**
+  - [ ] Add config file support (`agent-registry.config.js` or `.agent-registryrc`)
+  - [ ] Implement selective sync (whitelist/blacklist like agent-skills-sync-tool)
+  - [ ] Add CLI flags: `--dry-run`, `--verbose`, `--platforms` filter
+  - [ ] Interactive setup wizard (use `inquirer` library)
+  - [ ] Add progress bars and colored output (use `chalk`)
+  - [ ] Update README with new workflow examples
+  
+  **Phase 4: Standards alignment & ecosystem (1-2 weeks)**
+  - [ ] Adopt Agent Skills spec (https://agentskills.io)
+  - [ ] Add version pinning + provenance metadata to package.json
+  - [ ] Make compatible with `gh skill list/install` workflow
+  - [ ] Support cloud platform sync (Playwright for Perplexity, Claude Desktop)
+  - [ ] Add skill publishing workflow
+  - [ ] Document how to use as npm library (import/require)
+  
+  **Benefits of this work:**
+  - ✅ Cross-platform (Windows, macOS, Linux all equally supported)
+  - ✅ Globally installable: `npm install -g agent-registry`
+  - ✅ Easier maintenance (TypeScript/JS vs. bash + jq)
+  - ✅ Better IDE support and testing
+  - ✅ Align with `gh skill` standard (emerging official GitHub approach)
+  - ✅ Competitive against agent-skills-sync-tool (adds selective sync) and opensite-skills (adds distribution)
+  - ✅ Appeal to JavaScript/Node.js developer community
+  - ✅ Enable npm library usage (not just CLI)
+  
+  **Research artifact:** Competitive analysis vs. agent-skills-sync-tool, opensite-skills, GitHub CLI
+  (see: https://github.com/alexnesteruk/agent-registry/discussions/[TBD])
+
+- **Package for external/team use.** Mostly overlaps with npm migration above. Requires
+  generalizing away from hardcoded `$HOME`-relative assumptions and documenting for users
+  with different target directory structures.
+
 - **More sync targets** (Cursor, Windsurf, Zed, Cline, etc.). Benefit is the core value
   proposition, one edit propagates everywhere, but cost compounds per target: every
   tool's real mechanism has been a surprise so far (OpenCode's `permission:` map,
   Copilot's `tools:` schema, Antigravity's still-unverified enforcement above), so each
   addition is its own research-and-verify cycle plus a translator plus test coverage,
   not a copy-paste.
+
 - **Auto-sync on save** (git hook or file watcher instead of remembering to run
   `sync.sh`). Low cost, direct benefit: removes the one manual step that's already
   caused real drift (the stale `SandBox17/.opencode` copy existed because nothing
   forced a re-sync, see "Other known gaps" above).
-- **CI validation** (run `sync.test.sh` in a GitHub Action on push). Low cost since the
+
+- **CI validation** (run sync tests in a GitHub Action on push). Low cost since the
   test suite already exists. Catches a translator regression before it reaches the real
   `~/.claude`/`~/.opencode`/etc. targets, instead of only being caught by hand, which is
   how the OpenCode crash and the silent tools-dropping bug were both found.
+
 - **Extend beyond agents/skills/personas to MCP server configs.** There's already a real
   MCP entry wired into `~/.opencode/config.json` pointing at the sibling
   `agent-registry-mcp` repo. Folding that config into the same source-of-truth/sync
