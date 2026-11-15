@@ -10,9 +10,10 @@ agent-registry/
 ├── skills/       ← skill definitions (become slash commands / invocable skills)
 ├── personas/     ← behavioral personas, compiled into Copilot and Gemini
 ├── guidelines/   ← long-form playbooks referenced by agents (e.g. war_room_playbook.md)
+├── src/sync.ts   ← the sync tool (TypeScript, runs natively on Node ≥23.6)
+├── test/         ← Vitest suite: unit + integration + bash/TS parity check
 ├── scripts/
-│   ├── sync.sh                       ← run this after any change to agents/skills/personas
-│   ├── sync.test.sh                  ← sync.sh's test suite
+│   ├── sync.sh (+ sync.test.sh)      ← legacy bash version, kept during cutover (see TODO.md)
 │   └── snitch_risk.py (+ .test.py)   ← fantasy-football draft turn-survival calculator
 ├── .github/copilot-instructions.md   ← auto-generated, don't edit directly
 ├── package.json
@@ -26,7 +27,7 @@ Alongside the general-purpose agents, the registry hosts a **fantasy-football wa
 
 ## Sync targets
 
-Running `./scripts/sync.sh` pushes everything out:
+Running `npm run sync` pushes everything out:
 
 | CLI | Gets | Location |
 |---|---|---|
@@ -36,17 +37,17 @@ Running `./scripts/sync.sh` pushes everything out:
 | Gemini | personas only (compiled) | `~/.gemini/GEMINI.md` |
 | GitHub Copilot | agents (as custom `.agent.md`) + personas (compiled) | `~/.copilot/agents/`, `.github/copilot-instructions.md` |
 
-Each CLI has a different native tool-permission format, so `sync.sh` translates the `tools:` field in `agents/*.md` per target (see `translate_tools_for_claude` / `translate_tools_for_opencode` / `translate_tools_for_copilot` in the script). Antigravity's translation is still unverified; see `TODO.md`.
+Each CLI has a different native tool-permission format, so the sync tool translates the `tools:` field in `agents/*.md` per target (see `translateToolsForClaude` / `translateToolsForOpencode` / `translateToolsForCopilot` in `src/sync.ts`). Antigravity's translation is still unverified; see `TODO.md`.
 
 ## How to use it
 
-**Add or edit an agent:** create/edit a file in `agents/`, following the format of an existing one (frontmatter: `name`, `description`, `model`, `tools` required; `persona`, `skills` optional; body: a short second-person bullet list of concrete behaviors). Run `./scripts/sync.sh` afterward. New agents won't show up in a CLI's subagent list until you start a fresh session there.
+**Add or edit an agent:** create/edit a file in `agents/`, following the format of an existing one (frontmatter: `name`, `description`, `model`, `tools` required; `persona`, `skills` optional; body: a short second-person bullet list of concrete behaviors). Run `npm run sync` afterward. New agents won't show up in a CLI's subagent list until you start a fresh session there.
 
-**Add or edit a skill:** create/edit a file in `skills/` (frontmatter: `name`, `description`, `arguments`; body: the prompt template). Run `./scripts/sync.sh`.
+**Add or edit a skill:** create/edit a file in `skills/` (frontmatter: `name`, `description`, `arguments`; body: the prompt template). Run `npm run sync`.
 
 **Add or edit a persona:** create/edit a file in `personas/`. Personas are referenced by name from an agent's `persona:` field, and compiled directly into Copilot/Gemini instructions.
 
-**After any change:** run `./scripts/sync.sh` from the repo root. It's idempotent, safe to run anytime.
+**After any change:** run `npm run sync` from the repo root. It's idempotent, safe to run anytime. Tests: `npm test` (Vitest, includes a byte-level parity check against the legacy bash version); `npm run typecheck`. CI runs both on every push.
 
 ## Known gaps
 
