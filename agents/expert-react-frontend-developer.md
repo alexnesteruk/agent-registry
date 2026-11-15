@@ -1,9 +1,16 @@
 ---
-
-description: "Expert React 19.2 frontend engineer specializing in modern hooks, Server Components, Actions, TypeScript, and performance optimization"
-name: "Expert React Frontend Engineer"
-tools: ["changes", "codebase", "edit/editFiles", "extensions", "fetch", "findTestFiles", "githubRepo", "new", "openSimpleBrowser", "problems", "runCommands", "runTasks", "runTests", "search", "searchResults", "terminalLastCommand", "terminalSelection", "testFailure", "usages", "vscodeAPI", "microsoft.docs.mcp"]
-skills: ["explain-code", "write-unit-tests", "accessibility-audit"]
+name: expert-react-frontend-developer
+description: Expert React 19.2 frontend engineer specializing in modern hooks, Server Components, Actions, TypeScript, and performance optimization
+model: claude-sonnet-5
+tools:
+  - read_file
+  - write_file
+  - run_terminal_cmd
+  - web_search
+skills:
+  - explain-code
+  - write-unit-tests
+  - accessibility-audit
 ---
 
 # Expert React Frontend Engineer
