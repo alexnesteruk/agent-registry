@@ -29,7 +29,9 @@ is, or dropped from what's synced to avoid implying a restriction that isn't rea
 
 `translateToolsForCopilot` in `src/sync.ts` maps `read_file`/`write_file`/`run_terminal_cmd`/`web_search` to `readFile`/`editFiles`/`runInTerminal`/`fetch`. Unlike Claude Code's mapping, th[...]
 
-Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed through untranslated, since its `tools:` already uses Copilot-style names) contains `"edit/editFiles"`. This exact [...]
+(An earlier note here about `expert-react-frontend-developer.agent.md` passing through
+untranslated no longer applies: that agent was normalized to the generic vocabulary on
+2026-11-15 and is now translated like the others.)
 
 **How to verify:** open a synced agent (e.g. `angular-developer`) in Copilot Chat in WebStorm or VS Code, check the Tools icon to see which of its listed tools actually resolve vs. show as unrecog[...]
 
@@ -48,11 +50,12 @@ validation errors for every file in `~/.gemini/agents/`. Gemini's schema is stri
 unknown keys are rejected (`Unrecognized key(s) in object: 'skills'`, which broke the
 three agents carrying `skills:` on the first sync), every tool name is validated
 (`tools.N: Invalid tool name`), and `name` must be a slug. Consequences now in the
-translator: `skills:` is dropped alongside `model:`/`persona:`, and
-`expert-react-frontend-developer.md` (inline VS Code tool names + non-slug name) is
-**skipped for Gemini** rather than written with `tools:` removed, since a missing
-`tools:` inherits every tool (fail-open). After the fix, `gemini skills list` loads
-all 8 remaining agents without errors.
+translator: `skills:` is dropped alongside `model:`/`persona:`, and any agent with an
+inline `tools: [...]` array is **skipped for Gemini** rather than written with `tools:`
+removed, since a missing `tools:` inherits every tool (fail-open). That skip path
+applied to `expert-react-frontend-developer.md` until it was normalized the same day
+(see below); after normalization `gemini skills list` loads all 9 agents without
+errors. The skip logic stays as the fail-safe for any future outlier.
 
 Still unverified:
 
@@ -63,30 +66,18 @@ Still unverified:
   2026-06-18, and `~/.gemini/antigravity-cli/` exists locally. Whether Antigravity CLI
   reads `~/.gemini/agents/` (or `~/.agents/agents/`, which we already write) is unknown.
 
-## Decide what to do with expert-react-frontend-developer for Gemini (added 2026-11-15)
+## expert-react-frontend-developer normalized (added 2026-11-15, RESOLVED same day)
 
-It is currently **skipped** by the Gemini sync (logged as `✗ ... skipped` on every run),
-so Gemini has 8 of the 9 agents. Gemini rejects it on two counts: its `name` ("Expert
-React Frontend Engineer") is not a slug, and all 21 entries in its inline `tools: [...]`
-array are VS Code/Copilot tool names Gemini doesn't recognize. Skipping was chosen over
-writing it with `tools:` removed because a missing `tools:` inherits every tool.
-
-This is the same agent flagged under "Other known gaps" as the pre-existing outlier
-(non-generic vocabulary, missing `model`), so the fix is really about that agent, not
-about Gemini. Options:
-
-- [ ] **Normalize the agent** (preferred): slug `name`, add `model`, and rewrite `tools:`
-      as the generic block list (`read_file`, `write_file`, `run_terminal_cmd`,
-      `web_search`) that every translator already understands. Fixes Gemini, OpenCode
-      (currently deny-all), and Claude Code (currently no working tools) in one edit.
-      Cost: it loses the Copilot-specific extras (`codebase`, `problems`, `usages`, etc.)
-      since the generic vocabulary has no equivalent; decide whether those mattered.
-- [ ] **Alternative: Gemini-only mapping** of the VS Code names onto Gemini tools
-      (`codebase`/`search` → `grep_search`/`glob`, `edit/editFiles` → `write_file`/`replace`,
-      `runCommands` → `run_shell_command`, `fetch` → `web_fetch`, etc.) plus name
-      slugification in the translator. More code, and only fixes Gemini.
-- [ ] **Alternative: accept the skip** and remove the per-run log noise by listing the
-      agent in an explicit `geminiSkip` set with a comment.
+Gemini rejected this agent (non-slug `name`, 21 unrecognized VS Code tool names) and it
+was briefly skipped by the Gemini sync. Resolved by normalizing the agent itself rather
+than special-casing Gemini: `name` is now the filename slug, `model: claude-sonnet-5`
+added, and `tools:` rewritten as the generic block list (`read_file`, `write_file`,
+`run_terminal_cmd`, `web_search`) every translator understands. One edit fixed Gemini,
+OpenCode (was deny-all), and Claude Code (had no working tools). The Copilot-only
+extras it used to list (`codebase`, `problems`, `usages`, `vscodeAPI`, `microsoft.docs.mcp`,
+etc.) are gone since the generic vocabulary has no equivalent; if any of those turn out
+to matter in Copilot, the fix is to extend the generic vocabulary + every translator,
+not to put Copilot names back in the source file. The body/system prompt was left as-is.
 
 ## Other known gaps
 
@@ -97,13 +88,10 @@ about Gemini. Options:
   geminicli.com/docs/cli/skills and docs.github.com). The agent-level `persona:` field
   was never consumed by anything, and nothing read `~/.opencode/personas/`.
 
-- `expert-react-frontend-developer.md` uses VS Code/Copilot-specific tool names in its
-  `tools:` field (not this library's generic vocabulary), and lacks the `model` field
-  other agents have. For OpenCode, `translateToolsForOpencode` now translates
-  this inline-array case to an explicit deny-all rather than silently dropping it (fixed
-  2026-07-21, caught by `scripts/sync.test.sh`). For Claude Code, it's still unmapped and
-  the agent gets no working tools if invoked as a subagent there, and the same fix pattern
-  would apply if that's ever needed.
+- (Resolved 2026-11-15) `expert-react-frontend-developer.md` used to carry VS Code-specific
+  inline-array tool names and no `model`; see the normalization section above. The
+  inline-array handling it motivated stays in the translators (OpenCode → explicit
+  deny-all, fixed 2026-07-21; Gemini → skip) as fail-safes, covered by fixture tests.
 - No project-local `.opencode/agents`/`.opencode/skills` symlink exists anymore (removed
   2026-07-21). It's unnecessary: OpenCode resolves the global `~/.opencode/agents/` copy
   (translated, permission-mapped) from any cwd, confirmed via `opencode agent list` run

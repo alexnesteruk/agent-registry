@@ -46,4 +46,4 @@ Each CLI has a different native tool-permission format, so the sync tool transla
 
 ## Known gaps
 
-See `TODO.md` for open questions (mainly around Antigravity's real tool-permission mechanism, and a couple of pre-existing inconsistencies in `expert-react-frontend-developer.md`).
+See `TODO.md` for open questions (mainly whether Antigravity and Gemini actually enforce the `tools:` restriction at runtime, and the Copilot tool-name mapping).

@@ -207,7 +207,10 @@ describe("integration: full main() run against real source content", () => {
     expect(gemini).not.toMatch(/^model:/m);
     expect(gemini).not.toMatch(/^persona:/m);
     expect(gemini).not.toMatch(/^skills:/m);
-    // Inline-array agent is skipped for Gemini (see translateToolsForGemini).
-    expect(fs.existsSync(path.join(tmpRoot, "gemini/agents/expert-react-frontend-developer.md"))).toBe(false);
+    // All 9 agents use the generic vocabulary since 2026-11-15, so none is skipped.
+    expect(fs.readdirSync(path.join(tmpRoot, "gemini/agents"))).toHaveLength(
+      fs.readdirSync(path.join(tmpRoot, "claude/agents")).length,
+    );
+    expect(read("gemini/agents/expert-react-frontend-developer.md")).toContain("name: expert-react-frontend-developer");
   });
 });
