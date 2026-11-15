@@ -1,0 +1,24 @@
+# CI for the sync tool (TODO.md npm-migration Phase 1). Runs the TypeScript
+# typecheck, the Vitest suite (unit + integration + bash/TS golden-diff parity),
+# and the legacy bash test suite until scripts/sync.sh is retired.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # >=23.6 required: src/sync.ts runs via Node's native type stripping
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:bash

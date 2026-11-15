@@ -1,7 +1,17 @@
 {
   "name": "agent-registry",
   "private": true,
+  "type": "module",
   "scripts": {
-    "sync": "bash scripts/sync.sh"
+    "sync": "node src/sync.ts",
+    "sync:bash": "bash scripts/sync.sh",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "test:bash": "bash scripts/sync.test.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   }
 }
