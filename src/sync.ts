@@ -1,30 +1,30 @@
 // Syncs agent-registry to all supported AI CLI targets.
 //
-// TypeScript port of scripts/sync.sh (2026-09-09). Behavior is intentionally
-// byte-identical to the bash version — verified by test/parity.test.ts, which
-// runs both against the same sources and diffs the output trees. Keep it that
-// way until the bash version is deleted (see TODO.md Phase 1 cutover).
-//
 // Global targets:
-//   ~/.opencode/         OpenCode (agents get tools: → permission: translation)
-//   ~/.agents/           Antigravity (agents copied untranslated — see TODO.md)
-//   ~/.claude/           Claude Code (agents get tools: name translation)
-//   ~/.copilot/agents/   GitHub Copilot custom agents (tools: name translation,
-//                        .agent.md extension)
-//   ~/.gemini/GEMINI.md  Gemini (personas only, compiled)
+//   ~/.opencode/         OpenCode (agents get tools: → permission: translation; skills)
+//   ~/.agents/           Antigravity (agents copied untranslated — see TODO.md; skills).
+//                        ~/.agents/skills/ is ALSO read by Gemini CLI and Copilot CLI
+//                        as an official alias for their own skills dirs (verified
+//                        2026-11-15 against geminicli.com and docs.github.com), so one
+//                        write reaches all three.
+//   ~/.claude/           Claude Code (agents get tools: name translation; skills as commands)
+//   ~/.copilot/agents/   GitHub Copilot custom agents (tools: name translation, .agent.md)
+//   ~/.gemini/agents/    Gemini CLI custom subagents (tools: name translation; model:
+//                        and persona: dropped — see translateToolsForGemini)
 //
 // All global target dirs are env-overridable (OPENCODE_DIR, ANTIGRAVITY_DIR,
-// CLAUDE_DIR, COPILOT_DIR, GEMINI_DIR), defaulting to $HOME/.<tool>. This is
-// what makes the sync testable without touching real global config: point them
-// at a temp dir and run the whole thing for real.
+// CLAUDE_DIR, COPILOT_DIR, GEMINI_DIR), defaulting to $HOME/.<tool>, and
+// injectable via main(options). This is what makes the sync testable without
+// touching real global config: point them at a temp dir and run the whole thing.
 //
-// Project-local (this repo only):
-//   .github/copilot-instructions.md  (personas only, compiled — GitHub Copilot's
-//     repo-level instructions feature; separate from ~/.copilot/agents/ above)
+// Personas were removed 2026-11-15: they only existed to reach Gemini (GEMINI.md)
+// and Copilot (repo-local copilot-instructions.md) before those tools had native
+// agents/skills. Both now do, and the agent-level `persona:` field was never wired
+// into anything.
 //
 // The translators are deliberately LINE-BASED string transforms, not YAML
 // parse/re-serialize: parsing would reformat frontmatter (key order, quoting,
-// comments) and make parity checking against the awk originals impossible.
+// comments) in every synced file.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -33,7 +33,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REGISTRY_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const PERSONAS_DIR = path.join(REGISTRY_DIR, "personas");
 const AGENTS_DIR = path.join(REGISTRY_DIR, "agents");
 const SKILLS_DIR = path.join(REGISTRY_DIR, "skills");
 
@@ -43,34 +42,13 @@ const defaultLog: Logger = (message) => {
   process.stdout.write(`\x1b[1;34m[sync-ai]\x1b[0m ${message}\n`);
 };
 
-// Mirrors awk record semantics: input is processed line by line, and output
-// always ends with a trailing newline when non-empty (awk's ORS), even if the
-// input file lacked one.
+// Input is processed line by line; output always ends with a trailing newline
+// when non-empty, even if the input file lacked one.
 function transformLines(content: string, fn: (lines: string[]) => string[]): string {
   const lines = content.split("\n");
   if (lines[lines.length - 1] === "") lines.pop();
   const out = fn(lines);
   return out.length ? out.join("\n") + "\n" : "";
-}
-
-export function stripFrontmatter(content: string): string {
-  return transformLines(content, (lines) => {
-    const out: string[] = [];
-    let fm = false;
-    lines.forEach((line, i) => {
-      if (line === "---") {
-        if (i === 0) {
-          fm = true;
-          return;
-        } else if (fm) {
-          fm = false;
-          return;
-        }
-      }
-      if (!fm) out.push(line);
-    });
-    return out;
-  });
 }
 
 // agents/*.md are authored with a generic tool vocabulary (read_file, write_file,
@@ -80,15 +58,31 @@ export function stripFrontmatter(content: string): string {
 // zero real write access and hallucinated fake tool-call output instead of erroring).
 // Names with no entry pass through unchanged (e.g. expert-react-frontend-developer.md
 // already uses VS Code/Copilot-specific names, not this generic vocabulary).
-function translateBlockListTools(content: string, map: Record<string, string>): string {
+//
+// `dropKeys` removes whole frontmatter entries (the key line plus any indented
+// continuation lines) for targets that would reject or misread them.
+function translateBlockListTools(
+  content: string,
+  map: Record<string, string>,
+  dropKeys: readonly string[] = [],
+): string {
   return transformLines(content, (lines) => {
     const out: string[] = [];
     let inFm = false;
     let inTools = false;
+    let dropping = false;
     for (const line of lines) {
       if (line === "---") {
         inFm = !inFm;
+        dropping = false;
         out.push(line);
+        continue;
+      }
+      if (inFm && dropping && (line.startsWith("  ") || line === "")) continue;
+      dropping = false;
+      if (inFm && dropKeys.some((k) => line.startsWith(`${k}:`))) {
+        dropping = true;
+        inTools = false;
         continue;
       }
       if (inFm && line.startsWith("tools:")) {
@@ -131,6 +125,48 @@ export function translateToolsForCopilot(content: string): string {
   });
 }
 
+// Gemini CLI custom subagents (geminicli.com/docs/core/subagents): ~/.gemini/agents/*.md
+// with YAML frontmatter. `tools:` is a list of Gemini's built-in tool names and
+// DOES restrict the agent (omitted = inherits all). Names confirmed against the
+// docs and the installed gemini-cli 0.46.0 bundle.
+//
+// Verified empirically 2026-11-15 via `gemini skills list`, whose agent loader
+// prints validation errors: Gemini's schema is STRICT. Unknown keys are rejected
+// ("Unrecognized key(s) in object: 'skills'"), every tool name is validated
+// ("tools.N: Invalid tool name"), and `name` must be a slug. Hence:
+//   - `model:` dropped (our values are Claude ids; Gemini defaults to `inherit`)
+//   - `persona:`/`skills:` dropped (registry-only keys; Gemini rejects the file)
+//   - an inline `tools: [...]` array (expert-react-frontend-developer.md's VS Code
+//     names, plus its non-slug name) is SKIPPED for Gemini rather than written
+//     with `tools:` removed, because a missing `tools:` inherits every tool —
+//     the fail-open outcome this translation layer exists to prevent.
+export function translateToolsForGemini(content: string): string | null {
+  if (hasInlineToolsArray(content)) return null;
+  return translateBlockListTools(
+    content,
+    {
+      read_file: "read_file",
+      write_file: "write_file",
+      run_terminal_cmd: "run_shell_command",
+      web_search: "google_web_search",
+    },
+    ["model", "persona", "skills"],
+  );
+}
+
+function hasInlineToolsArray(content: string): boolean {
+  let inFm = false;
+  for (const line of content.split("\n")) {
+    if (line === "---") {
+      if (inFm) return false;
+      inFm = true;
+      continue;
+    }
+    if (inFm && line.startsWith("tools:") && line.includes("[")) return true;
+  }
+  return false;
+}
+
 // OpenCode's real mechanism (confirmed via opencode.ai/docs/agents) is a
 // `permission:` map (allow/ask/deny), not a `tools:` list, so the generic
 // vocabulary's `tools:` key is unrecognized schema and must be translated.
@@ -138,7 +174,7 @@ export function translateToolsForCopilot(content: string): string {
 // An inline `tools: [...]` array (expert-react-frontend-developer.md's
 // VS Code-specific names) has no real OpenCode equivalent, so it becomes an
 // explicit deny-all: fail safe (no access) rather than fail open (default
-// access, the silent-drop bug this replaced — see sync.sh history).
+// access, the silent-drop bug this replaced).
 export function translateToolsForOpencode(content: string): string {
   const map: Record<string, string> = {
     read_file: "read",
@@ -237,37 +273,32 @@ export function main(options: SyncOptions = {}): void {
     log(`Synced ${count} ${label} → ${dest}`);
   };
 
+  // A translator returns null when the agent can't be represented safely for
+  // that target (see translateToolsForGemini); the agent is then skipped, not
+  // written in a fail-open form.
   const translateAgents = (
     dest: string,
-    translate: (content: string) => string,
+    translate: (content: string) => string | null,
     destName: (base: string) => string,
     doneMessage: (count: number) => string,
   ): void => {
     fs.mkdirSync(dest, { recursive: true });
     let count = 0;
     for (const f of mdFiles(AGENTS_DIR)) {
+      const translated = translate(fs.readFileSync(path.join(AGENTS_DIR, f), "utf8"));
+      if (translated === null) {
+        log(`  ✗ ${f} skipped: not representable for this target (see translator comment in src/sync.ts)`);
+        continue;
+      }
       const outPath = path.join(dest, destName(path.basename(f, ".md")));
-      fs.writeFileSync(outPath, translate(fs.readFileSync(path.join(AGENTS_DIR, f), "utf8")));
+      fs.writeFileSync(outPath, translated);
       log(`  → ${outPath} (tools translated)`);
       count++;
     }
     log(doneMessage(count));
   };
 
-  // Header string says sync.sh for byte-parity with the bash version; update it
-  // (and the parity test) together when the bash version is deleted.
-  const compilePersonas = (outFile: string): void => {
-    fs.mkdirSync(path.dirname(outFile), { recursive: true });
-    let out = "<!-- AUTO-GENERATED by sync.sh — edit files in personas/ -->\n\n";
-    for (const f of mdFiles(PERSONAS_DIR)) {
-      out += stripFrontmatter(fs.readFileSync(path.join(PERSONAS_DIR, f), "utf8")) + "\n";
-    }
-    fs.writeFileSync(outFile, out);
-  };
-
   // ── OpenCode (global) ──────────────────────────────────────────────────────
-
-  syncDir(PERSONAS_DIR, path.join(opencodeDir, "personas"), "persona(s)");
 
   translateAgents(
     path.join(opencodeDir, "agents"),
@@ -278,7 +309,7 @@ export function main(options: SyncOptions = {}): void {
 
   syncDir(SKILLS_DIR, path.join(opencodeDir, "skills"), "skill(s)");
 
-  // ── Antigravity (global) ───────────────────────────────────────────────────
+  // ── Antigravity (global) — skills dir doubles as the Gemini/Copilot alias ──
   //
   // Agents ARE read from here (confirmed empirically), but whether the tools:
   // field inside agent.md does anything is unverified — see TODO.md. Left
@@ -302,7 +333,7 @@ export function main(options: SyncOptions = {}): void {
     log(`  → ${path.join(dest, "SKILL.md")}`);
     count++;
   }
-  log(`Synced ${count} skill(s) → ${path.join(antigravityDir, "skills")}/`);
+  log(`Synced ${count} skill(s) → ${path.join(antigravityDir, "skills")}/ (also read by Gemini CLI + Copilot CLI)`);
 
   // ── Claude Code (global) ───────────────────────────────────────────────────
 
@@ -328,17 +359,14 @@ export function main(options: SyncOptions = {}): void {
     (n) => `Synced ${n} agent(s) → ${path.join(copilotDir, "agents")}/ (tools translated to Copilot names, .agent.md)`,
   );
 
-  // ── GitHub Copilot — personas only (project-local) ─────────────────────────
+  // ── Gemini CLI custom subagents (global) ───────────────────────────────────
 
-  const copilotFile = path.join(REGISTRY_DIR, ".github", "copilot-instructions.md");
-  compilePersonas(copilotFile);
-  log(`Compiled personas → ${copilotFile}`);
-
-  // ── Gemini — personas only ─────────────────────────────────────────────────
-
-  const geminiFile = path.join(geminiDir, "GEMINI.md");
-  compilePersonas(geminiFile);
-  log(`Compiled personas → ${geminiFile}`);
+  translateAgents(
+    path.join(geminiDir, "agents"),
+    translateToolsForGemini,
+    (base) => `${base}.md`,
+    (n) => `Synced ${n} agent(s) → ${path.join(geminiDir, "agents")}/ (tools translated to Gemini names; model:/persona:/skills: dropped)`,
+  );
 
   log("Done.");
 }

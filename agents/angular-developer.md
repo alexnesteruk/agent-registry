@@ -1,7 +1,6 @@
 ---
 name: angular-developer
 description: Expert Angular 18+ developer focused on standalone components, SSR, and idiomatic patterns
-persona: senior-engineer
 model: claude-sonnet-5
 tools:
   - read_file

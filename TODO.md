@@ -33,11 +33,73 @@ Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed
 
 **How to verify:** open a synced agent (e.g. `angular-developer`) in Copilot Chat in WebStorm or VS Code, check the Tools icon to see which of its listed tools actually resolve vs. show as unrecog[...]
 
+## Verify Gemini CLI subagent sync (added 2026-11-15)
+
+`translateToolsForGemini` in `src/sync.ts` writes agents to `~/.gemini/agents/*.md`,
+mapping `run_terminal_cmd` → `run_shell_command` and `web_search` → `google_web_search`
+(`read_file`/`write_file` already match). Tool names were confirmed against
+geminicli.com/docs/core/subagents + the file-system and web-search tool pages, and by
+grepping the installed gemini-cli 0.46.0 bundle. The docs state `tools:` restricts the
+agent (omitted = inherits all). `model:` is dropped (our values are Claude ids; Gemini
+defaults to `inherit`); `persona:` and `skills:` are dropped (registry-only keys).
+
+**Verified 2026-11-15** by running `gemini skills list`, whose agent loader prints
+validation errors for every file in `~/.gemini/agents/`. Gemini's schema is strict:
+unknown keys are rejected (`Unrecognized key(s) in object: 'skills'`, which broke the
+three agents carrying `skills:` on the first sync), every tool name is validated
+(`tools.N: Invalid tool name`), and `name` must be a slug. Consequences now in the
+translator: `skills:` is dropped alongside `model:`/`persona:`, and
+`expert-react-frontend-developer.md` (inline VS Code tool names + non-slug name) is
+**skipped for Gemini** rather than written with `tools:` removed, since a missing
+`tools:` inherits every tool (fail-open). After the fix, `gemini skills list` loads
+all 8 remaining agents without errors.
+
+Still unverified:
+
+- Does Gemini actually *enforce* the `tools:` restriction at runtime? Schema-level
+  validation is confirmed; invoke a synced agent with a narrow list and try a tool
+  outside it to confirm enforcement.
+- The Gemini docs note unpaid/Google One users were moved to **Antigravity CLI** on
+  2026-06-18, and `~/.gemini/antigravity-cli/` exists locally. Whether Antigravity CLI
+  reads `~/.gemini/agents/` (or `~/.agents/agents/`, which we already write) is unknown.
+
+## Decide what to do with expert-react-frontend-developer for Gemini (added 2026-11-15)
+
+It is currently **skipped** by the Gemini sync (logged as `✗ ... skipped` on every run),
+so Gemini has 8 of the 9 agents. Gemini rejects it on two counts: its `name` ("Expert
+React Frontend Engineer") is not a slug, and all 21 entries in its inline `tools: [...]`
+array are VS Code/Copilot tool names Gemini doesn't recognize. Skipping was chosen over
+writing it with `tools:` removed because a missing `tools:` inherits every tool.
+
+This is the same agent flagged under "Other known gaps" as the pre-existing outlier
+(non-generic vocabulary, missing `model`), so the fix is really about that agent, not
+about Gemini. Options:
+
+- [ ] **Normalize the agent** (preferred): slug `name`, add `model`, and rewrite `tools:`
+      as the generic block list (`read_file`, `write_file`, `run_terminal_cmd`,
+      `web_search`) that every translator already understands. Fixes Gemini, OpenCode
+      (currently deny-all), and Claude Code (currently no working tools) in one edit.
+      Cost: it loses the Copilot-specific extras (`codebase`, `problems`, `usages`, etc.)
+      since the generic vocabulary has no equivalent; decide whether those mattered.
+- [ ] **Alternative: Gemini-only mapping** of the VS Code names onto Gemini tools
+      (`codebase`/`search` → `grep_search`/`glob`, `edit/editFiles` → `write_file`/`replace`,
+      `runCommands` → `run_shell_command`, `fetch` → `web_fetch`, etc.) plus name
+      slugification in the translator. More code, and only fixes Gemini.
+- [ ] **Alternative: accept the skip** and remove the per-run log noise by listing the
+      agent in an explicit `geminiSkip` set with a comment.
+
 ## Other known gaps
 
+- **Personas removed 2026-11-15.** They only existed to reach Gemini (`~/.gemini/GEMINI.md`)
+  and Copilot (repo-local `.github/copilot-instructions.md`) before those tools had
+  native agents/skills; both now do (Gemini subagents above; `~/.agents/skills/` is an
+  official alias read by Gemini CLI and Copilot CLI, verified 2026-11-15 against
+  geminicli.com/docs/cli/skills and docs.github.com). The agent-level `persona:` field
+  was never consumed by anything, and nothing read `~/.opencode/personas/`.
+
 - `expert-react-frontend-developer.md` uses VS Code/Copilot-specific tool names in its
-  `tools:` field (not this library's generic vocabulary), and lacks `persona`/`model`
-  fields other agents have. For OpenCode, `translateToolsForOpencode` now translates
+  `tools:` field (not this library's generic vocabulary), and lacks the `model` field
+  other agents have. For OpenCode, `translateToolsForOpencode` now translates
   this inline-array case to an explicit deny-all rather than silently dropping it (fixed
   2026-07-21, caught by `scripts/sync.test.sh`). For Claude Code, it's still unmapped and
   the agent gets no working tools if invoked as a subagent there, and the same fix pattern
@@ -51,18 +113,11 @@ Separately, `~/.copilot/agents/expert-react-frontend-developer.agent.md` (passed
 
 ## Testing
 
-`npm test` runs the Vitest suite in `test/`: `sync.test.ts` covers the translateToolsFor* /
-stripFrontmatter functions (fixture-based unit tests) plus one integration test that runs
-the real `main()` against real source content with every global target dir injected via
-`main(options)` and pointed at a temp directory; `parity.test.ts` runs the legacy bash
-`sync.sh` and `src/sync.ts` against the same sources and requires byte-identical output
-trees (`diff -r`). `npm run typecheck` runs `tsc`. CI (`.github/workflows/ci.yml`) runs
-both plus the legacy suite on every push.
-
-Legacy: `bash scripts/sync.test.sh` (or `npm run test:bash`) is the original bash suite,
-kept until the bash version is deleted at cutover (see Phase 1 below). `sync.sh` is
-sourceable without side effects (`main()` only runs when executed directly) specifically
-so that works.
+`npm test` runs the Vitest suite in `test/sync.test.ts`: fixture-based unit tests for
+every `translateToolsFor*` function plus one integration test that runs the real
+`main()` against real source content with every global target dir injected via
+`main(options)` and pointed at a temp directory, so it never touches real config.
+`npm run typecheck` runs `tsc`. CI (`.github/workflows/ci.yml`) runs both on every push.
 
 ## Future directions (added 2026-07-25)
 
@@ -95,10 +150,8 @@ Candidate next steps, roughly in priority order based on cost against benefit:
         + legacy bash suite, Node 24, on push/PR
   - [x] Cutover: `npm run sync` now runs the TS version (`npm run sync:bash` keeps the
         old one available)
-  - [ ] After ~a week of real `npm run sync` use (from 2026-09-09): delete
-        `scripts/sync.sh` + `scripts/sync.test.sh` + the parity test + `sync:bash`/
-        `test:bash` scripts, and update the "AUTO-GENERATED by sync.sh" header string
-        in `src/sync.ts` (kept verbatim for byte-parity) to say sync.ts
+  - [x] Cutover completed 2026-11-15: `scripts/sync.sh`, `scripts/sync.test.sh`, the
+        parity test, and the `sync:bash`/`test:bash` npm scripts deleted. Phase 1 closed.
 
   **Phase 2: packaging & publish**
   - Public/private mechanism DECIDED 2026-09-09: frontmatter `visibility: public` flag,
@@ -134,7 +187,8 @@ Candidate next steps, roughly in priority order based on cost against benefit:
   generalizing away from hardcoded `$HOME`-relative assumptions and documenting for users
   with different target directory structures.
 
-- **More sync targets** (Cursor, Windsurf, Zed, Cline, etc.). Benefit is the core value
+- **More sync targets** (Cursor, Windsurf, Zed, Cline, etc.). Gemini CLI subagents were
+  added 2026-11-15 (see verification section above). Benefit is the core value
   proposition, one edit propagates everywhere, but cost compounds per target: every
   tool's real mechanism has been a surprise so far (OpenCode's `permission:` map,
   Copilot's `tools:` schema, Antigravity's still-unverified enforcement above), so each
@@ -155,10 +209,10 @@ Candidate next steps, roughly in priority order based on cost against benefit:
   Phase 4, 2026-09-09.) Doubles as an exposure channel if the spec's ecosystem lists
   compatible tools.
 
-- **`gh skill list/install` compatibility.** (Split out of former Phase 4.) VERIFY the
-  command actually exists as described before planning against it — every external
-  mechanism assumed so far (OpenCode `permission:`, Copilot `tools:`, Antigravity)
-  turned out to be a surprise.
+- **`gh skill` compatibility.** (Split out of former Phase 4.) Existence CONFIRMED
+  2026-11-15: GitHub's Copilot CLI docs (docs.github.com, create-skills page) reference
+  `gh skill` for searching, installing, updating, and publishing agent skills. Exact
+  subcommand syntax still unchecked — read `gh skill --help` before building against it.
 
 - **Cloud platform sync (Playwright for Perplexity, Claude Desktop).** (Split out of
   former Phase 4.) A separate project with its own risk profile, not a sync-tool feature.
@@ -166,7 +220,7 @@ Candidate next steps, roughly in priority order based on cost against benefit:
 - **Version pinning + provenance metadata in package.json.** (Split out of former
   Phase 4.) Only meaningful once the npm package exists and has consumers.
 
-- **Extend beyond agents/skills/personas to MCP server configs.** There's already a real
+- **Extend beyond agents/skills to MCP server configs.** There's already a real
   MCP entry wired into `~/.opencode/config.json` pointing at the sibling
   `agent-registry-mcp` repo. Folding that config into the same source-of-truth/sync
   pattern is a moderate lift but closes a real gap, that config isn't versioned or

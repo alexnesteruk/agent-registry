@@ -4,10 +4,8 @@
   "type": "module",
   "scripts": {
     "sync": "node src/sync.ts",
-    "sync:bash": "bash scripts/sync.sh",
     "typecheck": "tsc",
-    "test": "vitest run",
-    "test:bash": "bash scripts/sync.test.sh"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
